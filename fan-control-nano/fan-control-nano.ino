@@ -93,11 +93,11 @@ const byte pwm[] = {5, 6, 9, 10, 11};
 // COLS: manual[0-1], current[0-255], LOW[0-255], HIGH[0-255], CRITICAL[255], ...
 //                                         tLOW[0-85], tHIGH[0-85], tCRITICAL[85]
 byte preset[][8] = {
-  {0, 128, 30, 200, 255, 15, 60, 85},
-  {0, 128, 30, 200, 255, 15, 60, 85},
-  {0, 128, 30, 200, 255, 15, 60, 85},
-  {0, 128, 30, 200, 255, 15, 60, 85},
-  {0, 128, 30, 200, 255, 15, 60, 85}
+  {0, 128, 30, 250, 255, 20, 60, 85},
+  {0, 128, 30, 250, 255, 20, 60, 85},
+  {0, 128, 30, 250, 255, 20, 60, 85},
+  {0, 128, 30, 250, 255, 20, 60, 85},
+  {0, 128, 30, 250, 255, 20, 60, 85}
 };
 
 // Define interrupt pins
@@ -239,11 +239,11 @@ void loop() {
           case 'E':
             Serial.println(preset[4][1]); break;
           case '?':
-            Serial.print(preset[0][1]); Serial.print('; ');
-            Serial.print(preset[1][1]); Serial.print('; ');
-            Serial.print(preset[2][1]); Serial.print('; ');
-            Serial.print(preset[3][1]); Serial.print('; ');
-            Serial.println(preset[4][1]); break;
+            Serial.print(preset[0][1]); Serial.print(";");
+            Serial.print(preset[1][1]); Serial.print(";");
+            Serial.print(preset[2][1]); Serial.print(";");
+            Serial.print(preset[3][1]); Serial.print(";");
+            Serial.print(preset[4][1]); Serial.println(";"); break;
           default:
             Serial.print("Syntax Error: "); Serial.println(inputString);
             break;
@@ -268,7 +268,7 @@ void loop() {
         case 'D':
           Serial.println(rpmD); break;
         case '?':
-          Serial.print(rpmC); Serial.print('; ');
+          Serial.print(rpmC); Serial.print("; ");
           Serial.println(rpmD); break;
         default:
           Serial.print("Syntax Error: "); Serial.println(inputString);
@@ -276,7 +276,7 @@ void loop() {
       } 
     } else if (inputString.startsWith("fan?")) {
       // Print information about the fans
-      Serial.println("fancfg"); // Change this to the bit array.
+      Serial.println("fanmask"); // Change this to the bit array.
     } else if (inputString.startsWith("?")) {
       // Are you there?
       digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
@@ -299,7 +299,7 @@ void loop() {
         switch(inputString.charAt(1)) {
           case 'L':
             Serial.println(preset[value][2]); break;
-          case 'M':
+          case 'H':
             Serial.println(preset[value][3]); break;
           default:
             Serial.print("Syntax Error: "); Serial.println(inputString);
@@ -313,7 +313,7 @@ void loop() {
             preset[value][2] = constrain(byte(inputString.substring(3).toInt()), 0, preset[value][3]);
             Serial.print(preset[value][2]); 
             Serial.println(" OK"); break;
-          case 'M':
+          case 'H':
             preset[value][3] = constrain(byte(inputString.substring(3).toInt()), preset[value][2], preset[value][4]);
             Serial.print(preset[value][3]); 
             Serial.println(" OK"); break;
@@ -329,7 +329,7 @@ void loop() {
         switch(inputString.charAt(2)) {
           case 'L':
             Serial.println(preset[value][5]); break;
-          case 'M':
+          case 'H':
             Serial.println(preset[value][6]); break;
           default:
             Serial.print("Syntax Error: "); Serial.println(inputString);
@@ -338,14 +338,14 @@ void loop() {
       } else {
         // SET LOW or HIGH pwm settings.
         // But constrain LOW between 0 and HIGH, and constrain HIGH between LOW and CRITICAL.
-        switch(inputString.charAt(1)) {
+        switch(inputString.charAt(2)) {
           case 'L':
             preset[value][5] = constrain(byte(inputString.substring(4).toInt()), 0, preset[value][6]);
             Serial.print(preset[value][5]); 
             Serial.println(" OK"); break;
-          case 'M':
-            preset[value][3] = constrain(byte(inputString.substring(4).toInt()), preset[value][5], preset[value][7]);
-            Serial.println(preset[value][6]);
+          case 'H':
+            preset[value][6] = constrain(byte(inputString.substring(4).toInt()), preset[value][5], preset[value][7]);
+            Serial.print(preset[value][6]);
             Serial.println(" OK"); break;
           default:
             Serial.print("Syntax Error: "); Serial.println(inputString);

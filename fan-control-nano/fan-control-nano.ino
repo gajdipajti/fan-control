@@ -64,15 +64,19 @@ Serial Commands:
    * m?             - GET information for munin setup          
    * m!             - GET information for munin monitoring
 */
+// Ref: http://www.gammon.com.au/tips
+// #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
 #include <Wire.h> 
 #include <uptime.h>
 #include <OneWire.h>
+#include <DallasTemperature.h>
 // #include <LiquidCrystal_I2C.h>
 // LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 
 // Fan configuration - change this
-String fanconfiguration = "5ABCDE";
-const bool fanmask[5] = {true, true, true, true, true};
+// the compiler will work out the size
+const bool fanmask[] = {true, true, true, true, true};
 // Variables and constants which might be checked in the GUI
 const byte  swVersion = 001;
 const float hwVersion = 1.0;
@@ -80,14 +84,15 @@ const char  boardSubVersion = 'A';
 float time;
 
 // Define PWM pins Channel A-E
-const byte pwm[5] = {5, 6, 9, 10, 11};
+// the compiler will work out the size
+const byte pwm[] = {5, 6, 9, 10, 11};
 // const byte pwmF = 3;     // Used as interrupt
 
 // Define 2D settings array for pwm and temperature
-// ROWS: Channel A-E
+// ROWS: Channel A-E - the compiler will work out the size of the first dimension
 // COLS: manual[0-1], current[0-255], LOW[0-255], HIGH[0-255], CRITICAL[255], ...
 //                                         tLOW[0-85], tHIGH[0-85], tCRITICAL[85]
-byte preset[5][8] = {
+byte preset[][8] = {
   {0, 128, 30, 200, 255, 15, 60, 85},
   {0, 128, 30, 200, 255, 15, 60, 85},
   {0, 128, 30, 200, 255, 15, 60, 85},
@@ -104,10 +109,15 @@ volatile unsigned int rpmC = 0;
 volatile unsigned int rpmD = 0;
 
 // Define temperature and lcd pins
-char tempSource = 'L';      // The source of the temperature: 'L' - LM35, 'D' - DS18B20, ...
+char tempSource = 'D';      // The source of the temperature: 'L' - LM35, 'D' - DS18B20, ...
 const byte lm35 = A7;       // LM35 connected
-const byte ds18 = 12;       // DS18B20 sensor is connected
-OneWire  ds(ds18);
+const byte OneWireBus = 4;  // Data wire for OneWire
+bool dallasPresent = true;  // store dallas sensor status
+
+// Configure OneWire
+OneWire oneWire(OneWireBus);
+DallasTemperature sensors(&oneWire);
+DeviceAddress insideThermometer;
 
 // A4 -> LCD SDA
 // A5 -> LCD SCL
@@ -152,6 +162,14 @@ void setup() {  // The initial setup, that will run every time when we connect t
   delay(1000);
   
   inputString.reserve(128);   // reserve 128 bytes for the inputString
+
+  // OneWire setup;
+  if (!sensors.getAddress(insideThermometer, 0)) {
+    Serial.println("Unable to find address for Device 0");
+    dallasPresent = false;
+  }
+  sensors.setResolution(insideThermometer, 10);
+
   digitalWrite(LED_BUILTIN, LOW);
 }
 
@@ -165,8 +183,16 @@ float lm35Temp() {
 }
 
 float ds18Temp() {
-  // TODO
-  return 0.00;
+  if (dallasPresent) {
+    // call sensors.requestTemperatures() to issue a global temperature 
+    // request to all devices on the bus
+    sensors.requestTemperatures(); // Send the command to get temperatures
+    // printTemperature(insideThermometer); // Use a simple function to print out the data
+    float tempC = sensors.getTempC(insideThermometer);
+    return tempC;
+  } else {
+    return 80.00;   // In case of problem the output should be
+  }
 }
 
 float getTemperature(char Source) {
@@ -183,6 +209,7 @@ float getTemperature(char Source) {
 
 void loop() {
   if (stringComplete) {
+    Serial.println(inputString);
     if (inputString.startsWith("t")) {
       switch(inputString.charAt(1)) {
         case '?':
@@ -249,7 +276,7 @@ void loop() {
       } 
     } else if (inputString.startsWith("fan?")) {
       // Print information about the fans
-      Serial.println(fanconfiguration);
+      Serial.println("fancfg"); // Change this to the bit array.
     } else if (inputString.startsWith("?")) {
       // Are you there?
       digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
@@ -330,10 +357,12 @@ void loop() {
   } else if (automode) {
     // GET temperature in float, convert to int
     // UPDATE pwm if not in manual
-    int currentTemp = int(getTemperature(tempSource));
-    for (int idx = 0; idx < fanconfiguration.charAt(0); idx++) {
+    // To preserve the 0.25°C presicion, the temperature is multiplied by 4.
+    int currentTemp = int(getTemperature(tempSource)*4);
+    for (int idx = 0; idx < sizeof(fanmask); idx++) {
       if (fanmask[idx] && (preset[idx][0] == 0)) {
-        preset[idx][1] = map(currentTemp, preset[idx][5], preset[idx][6], preset[idx][2], preset[idx][3]);
+        // Multiply the temperature ranges by 4 also.
+        preset[idx][1] = map(currentTemp, preset[idx][5]*4, preset[idx][6]*4, preset[idx][2], preset[idx][3]);
         analogWrite(pwm[idx], preset[idx][1]);
       }
     }

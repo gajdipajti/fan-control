@@ -18,8 +18,9 @@ Pin Assignment:
    * PIN D3  (Timer2) Tachometer - Interrupt ChD
 
   Temperature measurement (one is enough):
-   * PIN D12          Dallas 1-wire
+   * PIN D12          Dallas 1-wire DS18B20
    * PIN A7  (ADC)    LM35
+   * PIN A6  (ADC)    NTC Thermistor - NTC B57164K0472K000 Rn: 4k7 Ohm; K = 3950; Rs = 4k7 Ohm
   Optional temperature pins:
    * PIN A0  (ADC) - tF
    * PIN A1  (ADC) - tE
@@ -51,10 +52,10 @@ Serial Commands:
   Optional Functions: [when extra circuit is present]
    * lcd[?,0-4] - GET/SET LCD Backlight; Update LCD
   Calibration Functions:
-   * Ch[L,H,C][A-F]?        - GET LOW HIGH temperatue for a channel
-   * Ch[L,H,C][A-F][0-100]  - SET LOW HIGH temperatue for a channel
-   * p[L,H][A-F]?         - GET LOW HIGH PWM speed for a channel
-   * p[L,H][A-F][0-255]   - SET LOW HIGH PWM for a channel
+   * Ch[L,H,C][A-F]?        - GET LOW HIGH temperature for a channel
+   * Ch[L,H,C][A-F][0-100]  - SET LOW HIGH temperature for a channel
+   * p[L,H][A-F]?           - GET LOW HIGH PWM speed for a channel
+   * p[L,H][A-F][0-255]     - SET LOW HIGH PWM for a channel
   Misc Func:
    * hrs?           - get board uptime [%d:%H:%M:%S]
    * ver?           - HW board version number
@@ -93,8 +94,8 @@ const byte pwm[] = {5, 6, 9, 10, 11};
 // COLS: manual[0-1], current[0-255], LOW[0-255], HIGH[0-255], CRITICAL[255], ...
 //                                         tLOW[0-85], tHIGH[0-85], tCRITICAL[85]
 byte preset[][8] = {
-  {0, 128, 30, 250, 255, 20, 60, 85},
-  {0, 128, 30, 250, 255, 20, 60, 85},
+  {0, 128, 30, 250, 255, 20, 30, 85},
+  {0, 128, 30, 250, 255, 20, 30, 85},
   {0, 128, 30, 250, 255, 20, 60, 85},
   {0, 128, 30, 250, 255, 20, 60, 85},
   {0, 128, 30, 250, 255, 20, 60, 85}
@@ -104,15 +105,26 @@ byte preset[][8] = {
 const byte intC = 2;
 const byte intD = 3;
 
-// Store rpm values in vol
-volatile unsigned int rpmC = 0;
-volatile unsigned int rpmD = 0;
+// Store rpm values in volatile time variables
+volatile unsigned long t_irpmC = 0;
+volatile unsigned long tC = 0;
+volatile unsigned long t_irpmD = 0;
+volatile unsigned long tD = 0;
+byte t0_corr = 0;
 
 // Define temperature and lcd pins
-char tempSource = 'D';      // The source of the temperature: 'L' - LM35, 'D' - DS18B20, ...
-const byte lm35 = A7;       // LM35 connected
+char tempSource = 'D';      // The source of the temperature: 'N' - NTC, 'L' - LM35, 'D' - DS18B20, ...
+const byte lm35 = A7;       // if an LM35 is connected
+const byte ntc  = A6;       // if an NTC is connected
 const byte OneWireBus = 4;  // Data wire for OneWire
 bool dallasPresent = true;  // store dallas sensor status
+
+// Define the thermistor
+// Ref for external library: https://www.arduino.cc/reference/en/libraries/thermistor/
+// NTC B57164K0472K000 Rn: 4k7 Ohm; K = 3950; Rs = 4k7 Ohm
+float Rn_ntc = 4700.00;
+float K_ntc = 3950.00;
+float Rs_ntc = 4700.00;
 
 // Configure OneWire
 OneWire oneWire(OneWireBus);
@@ -121,7 +133,7 @@ DeviceAddress insideThermometer;
 
 // A4 -> LCD SDA
 // A5 -> LCD SCL
-// A8 is conncected to the internal temperature sensor.
+// A8 is connected to the internal temperature sensor.
 
 // For LCD
 // bool lcdState = HIGH;
@@ -151,16 +163,30 @@ void setup() {  // The initial setup, that will run every time when we connect t
   pinMode(pwm[4], OUTPUT); analogWrite(pwm[4], LOW);
   // pinMode(pwmF, OUTPUT); analogWrite(pwmF, LOW);  // Not used
 
+  // Attach interrupts
+  // Ref: https://www.arduino.cc/reference/en/language/functions/external-interrupts/attachinterrupt/
+  pinMode(intC, INPUT_PULLUP);
+  pinMode(intD, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(intC), tachC, FALLING);
+  attachInterrupt(digitalPinToInterrupt(intD), tachD, FALLING);
+
   // Temperature input
-  analogReference(INTERNAL);    // set AREF to 1.1 V
+  // https://www.arduino.cc/reference/en/language/functions/analog-io/analogreference/
+  // analogReference(INTERNAL);    // set AREF to 1.1 V
+  pinMode(ntc,  INPUT);
   pinMode(lm35, INPUT);
 
   // Copied the relevant part from here: http://playground.arduino.cc/Code/PwmFrequency
+  // Also refs: 
+  // * https://forum.arduino.cc/t/varying-the-pwm-frequency-for-timer-0-or-timer-2/16679/3
+  // * https://docs.arduino.cc/tutorials/generic/secrets-of-arduino-pwm
+  t0_corr = 6;                            // Correction for Timer0 change
+  TCCR0B = TCCR0B & 0b11111000 | 0x01;    // The Arduino uses Timer 0 internally for the millis() and delay() functions
   TCCR1B = TCCR1B & 0b11111000 | 0x01;    // Change PWM Frequency for Timer1.  f=~31kHz
   // TCCR2B = TCCR2B & 0b11111000 | 0x01;    // Change PWM Frequency for Timer2.  f=~31kHz
 
-  delay(1000);
-  
+  // delay(1000);
+  // For Serial Communication
   inputString.reserve(128);   // reserve 128 bytes for the inputString
 
   // OneWire setup;
@@ -173,11 +199,27 @@ void setup() {  // The initial setup, that will run every time when we connect t
   digitalWrite(LED_BUILTIN, LOW);
 }
 
+float ntcTemp() {
+    float ADCntc = analogRead(ntc);
+    // Calculate the measured resistance using the reference series resistance.
+    float Rm_ntc = Rs_ntc / ((1024.00/ADCntc) - 1);
+    // Calculate the 1/T from the Steinhart equation. Note: T0 is in Kelvin.
+    float recT = 1/(273+25) + log(Rm_ntc/Rn_ntc)/K_ntc;
+    // Convert to Celsius.
+    return 1/recT - 273.00; 
+}
+
 float lm35Temp() {
   // LM35DZ: 10mV/°C -> (adc*(aref/1024))/10
-  // Current settings for AREF = 1100 mV
+  
+  // Settings for AREF = 1100 mV
   // Resolution: 0,11°C; Precision +/- 1 °C
   // Range: 0°C - 110°C [0 - 1023 ADC]
+  
+  // Settings for AREF = 5000 mV
+  // Resolution: 0,49°C; Precision +/- 1 °C
+  // Range: 0°C - 110°C [0 - 225 ADC]
+
   float tmV = analogRead(lm35);
   return tmV*(110.00/1024.00);
 }
@@ -198,6 +240,8 @@ float ds18Temp() {
 float getTemperature(char Source) {
   // NOTE: Implement here other sources.
   switch (Source) {
+    case 'N':
+      return ntcTemp();  break;
     case 'L':
       return lm35Temp(); break;
     case 'D':
@@ -205,6 +249,26 @@ float getTemperature(char Source) {
     default:
       break;
   }
+}
+
+void tachC() {
+  unsigned long time=micros();    // Store current microseconds.
+  // Calculate the time difference to last call. This might not be safe.
+  t_irpmC = time - tC;
+  tC = time;                      // Store last call time.
+}
+
+void tachD() {
+  unsigned long time=micros();    // Store current microseconds.
+  // Calculate the time difference to last call. This might not be safe.
+  t_irpmD = time - tD;
+  tD = time;                      // Store last call time.
+}
+
+unsigned long toRPM(unsigned long irpm, byte correction) {
+  // Calculate actual Rounds Per Minute
+  unsigned long rpm = 60000000/irpm;
+  return (rpm>1 && irpm > 0) ? rpm << correction : 0;
 }
 
 void loop() {
@@ -216,6 +280,8 @@ void loop() {
           Serial.println(getTemperature(tempSource)); break;
         case 's':
           Serial.println(tempSource); break;  // Display source
+        case 'N':
+          Serial.println(ntcTemp());  break;  // Only for debugging
         case 'L':
           Serial.println(lm35Temp()); break;  // Only for debugging
         case 'D':
@@ -264,12 +330,13 @@ void loop() {
     } else if (inputString.startsWith("rpm")) {
       switch(inputString.charAt(3)) {
         case 'C':
-          Serial.println(rpmC); break;
+
+          Serial.println(toRPM(t_irpmC, t0_corr)); break;
         case 'D':
-          Serial.println(rpmD); break;
+          Serial.println(toRPM(t_irpmD, t0_corr)); break;
         case '?':
-          Serial.print(rpmC); Serial.print("; ");
-          Serial.println(rpmD); break;
+          Serial.print(toRPM(t_irpmC, t0_corr)); Serial.print("; ");
+          Serial.println(toRPM(t_irpmD, t0_corr)); break;
         default:
           Serial.print("Syntax Error: "); Serial.println(inputString);
           break;
@@ -282,13 +349,16 @@ void loop() {
       digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
       Serial.println("OK");
     } else if (inputString.startsWith("hrs?")) {
-      // Uptime
-      uptime::calculateUptime();
-      Serial.print(uptime::getDays());      Serial.print(":");
-      Serial.print(uptime::getHours());     Serial.print(":");
-      Serial.print(uptime::getMinutes());   Serial.print(":");
-      Serial.println(uptime::getSeconds());
-
+      if (t0_corr == 0) {
+        // Uptime
+        uptime::calculateUptime();
+        Serial.print(uptime::getDays());      Serial.print(":");
+        Serial.print(uptime::getHours());     Serial.print(":");
+        Serial.print(uptime::getMinutes());   Serial.print(":");
+        Serial.println(uptime::getSeconds());
+      } else {
+        Serial.println("00:00:00:00");          // Timer0 source is not good.
+      }
     } else if (inputString.startsWith("cbn?")) { Serial.println(swVersion);  // Code Build Number
     } else if (inputString.startsWith("ver?")) {
       Serial.print(hwVersion, 1); Serial.println(boardSubVersion);            // Version Number + Board SubVersion
@@ -357,7 +427,7 @@ void loop() {
   } else if (automode) {
     // GET temperature in float, convert to int
     // UPDATE pwm if not in manual
-    // To preserve the 0.25°C presicion, the temperature is multiplied by 4.
+    // To preserve the 0.25°C precision, the temperature is multiplied by 4.
     int currentTemp = int(getTemperature(tempSource)*4);
     for (int idx = 0; idx < sizeof(fanmask); idx++) {
       if (fanmask[idx] && (preset[idx][0] == 0)) {
@@ -378,6 +448,6 @@ void serialEvent() {
     char inChar = (char)Serial.read();          // get the new byte
     if (inChar == '\r') {                       // if the incoming character is a carriage return (ASCII 13),
       stringComplete = true;                    // set a flag so the main loop can do something about it.
-    } else { inputString += inChar; }           // otherwies add it to the inputString                             
+    } else { inputString += inChar; }           // otherwise add it to the inputString                             
   }
 }

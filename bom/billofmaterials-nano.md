@@ -1,17 +1,28 @@
-# Bill Of Materials for the Arduino Nano based fan controller
+# Bill Of Materials for the Arduino Nano and Raspberry Pi based fan controller
 
-All the materials except the Arduino Nano v3 was bought from a local supplier: [Robotron Electronika](https://www.ret.hu/) - [pdf catalogue](https://www.ret.hu/FlippingBook/files/assets/downloads/files/RETKAT2012.pdf)
+All the materials except the Arduino Nano v3 and the Raspberry Pi was bought from a local supplier: [Robotron Electronika](https://www.ret.hu/) - [pdf catalogue](https://www.ret.hu/FlippingBook/files/assets/downloads/files/RETKAT2012.pdf)
 
 I also included RS links, where possible
 
-## Arduino and board
+## Arduino and Board
 
-* 1x H25PR050 single sided proto board - [RET 75-00-15](https://www.ret.hu/shop/product/rademacher/h25pr050_75-00-15) - 575 HUF/piece
+
 * 1x Arduino Nano v3 - [welectron AI-100005](https://www.welectron.com/Arduino-Nano_1), [RS 6961667](https://uk.rs-online.com/web/p/products/6961667/) - 19.99 Euro/piece - (can be replaced with a clone)
 * 1x female header BL1-036-G700-95 - [RET 53-03-04](https://www.ret.hu/shop/product/e-tec/36g-buchsenleiste_53-03-04) - 1199 HUF/piece
+* 1x 1N 4001 diode - [RET 19-00-01](https://www.ret.hu/shop/product/diotec/1n-4001_19-00-01), [RS 628-8931](https://uk.rs-online.com/web/p/schottky-diodes-rectifiers/6288931) - 18 HUF
+
+## Raspberry Pi and Board
+
+* Raspberry Pi Zero 2 W - [welectron RP1-120008](https://www.welectron.com/Raspberry-Pi-Zero-2-W_1) - 22.90 Euro/piece
+* 1x male-female header BE2-040-S161-55 [RET 53-10-01](https://www.ret.hu/shop/product/e-tec/2-x-20g-16mm-buchsenleiste_53-10-01) - 1439 HUF/piece
+* 1x male header SL2-050-S116/01-55 [RET 53-00-14](https://www.ret.hu/shop/product/e-tec/2-x-25g-stiftleiste_53-00-14) - 239 HUF/piece
+* 1x MCP3201 single channel A/D converter [RET 38-31-67](https://www.ret.hu/shop/product/microchip/mcp-3201-ci-p_38-31-67) - 2999 HUF/piece (_if needed_)
+
+## Board
+
+* 1x H25PR050 single sided proto board - [RET 75-00-15](https://www.ret.hu/shop/product/rademacher/h25pr050_75-00-15) - 575 HUF/piece
 * 1x male header SL1-036-SH116/01-55 - [RET 53-03-27](https://www.ret.hu/shop/product/e-tec/36g-stiftleiste_53-03-27) - 179 HUF/piece
 * 2x Jumper - [RET 53-14-29](https://www.ret.hu/shop/product/taiwan-king-pin-terminal/jumper-zart-fekete_53-14-29) - 29 HUF/piece
-* 1x 1N 4001 diode - [RET 19-00-01](https://www.ret.hu/shop/product/diotec/1n-4001_19-00-01), [RS 628-8931](https://uk.rs-online.com/web/p/schottky-diodes-rectifiers/6288931) - 18 HUF
 * 1x terminal [RET 53-05-69](https://www.ret.hu/shop/product/ptr-messtechnik/ak-500-2v_53-05-69) - 114 HUF/piece
 
 ## Temperature sensing
@@ -31,7 +42,7 @@ I also included RS links, where possible
 * 3x 3 pin fan header - [RET 53-34-30](https://www.ret.hu/shop/product/molex/22-27-2031_53-34-30), [RS 483-8477](https://uk.rs-online.com/web/p/products/4838477/)
 * 3x 2 pin fan header - [RET 53-34-29](https://www.ret.hu/shop/product/molex/22-27-2021_53-34-29), [RS 483-8461](https://uk.rs-online.com/web/p/products/4838461/)
 
-## RET Cart (in hungarian)
+## RET Cart for the Nano version (in hungarian)
 
 | Sorszám | Termékkód                                                                                         | Termék                    | Egységár (Nettó) | Egységár (Bruttó) | Mennyiség | Összesen (Nettó) | Összesen (Bruttó) |
 | ------- | ------------------------------------------------------------------------------------------------- | ------------------------- | ---------------- | ----------------- | --------- | ---------------- | ----------------- |

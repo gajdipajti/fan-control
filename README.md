@@ -1,11 +1,16 @@
 # fan-control
 
-A project for controlling 2, 3, and 4 wire DC fans using Arduino or a Raspberry Pi. It also integrates into munin monitoring. Funded by the Free Software Foundation Hungary. The code is under GPLv3. Schematics, drawings, and the documentation is under CC BY-SA-4.0. If you have an idea about how to improve the project, just file an issue.
+A project for controlling 2, 3, and 4 wire DC fans using an Arduino Nano or a Raspberry Pi. It also integrates into munin monitoring. Funded by the Free Software Foundation Hungary. The code is under GPLv3. Schematics, drawings, and the documentation is under CC BY-SA-4.0. If you have an idea about how to improve the project, just file an issue.
+
+## Pages
 
 * [Bill Of Materials](bom/billofmaterials-nano.md)
 * [Datasheet Archive](bom/datasheets.md)
+* [KiCad and Fritzing](circuits/)
 
 ## Fan Control Nano - Schematic
+
+*Note: There are multiple solutions displayed here, only implement the needed ones.*
 
 ![image](documentation/img/fan-control-nano-schematic.png)
 
@@ -36,3 +41,24 @@ A project for controlling 2, 3, and 4 wire DC fans using Arduino or a Raspberry 
   * **ver?**           - HW board version number
   * **cbn?**           - CODE build version number
   * **?**              - Ping, Are You There?  + Flash a LED
+
+## Fan Control RPi - Schematic
+
+*Note: There are multiple solutions displayed here, only implement the needed ones.*
+
+*Note: Under testing.*
+
+![image](documentation/img/fan-control-rpi-schematic.png)
+
+## Planned updates
+
+* External ADC experiments
+* Other board support (RP2040, Attiny85, ...)
+* Without machine spirit (no microcontroller)
+
+## References
+
+* [Arduino Language Reference](https://www.arduino.cc/reference/en/)
+* [Arduino Nano](https://docs.arduino.cc/hardware/nano)
+* [1-wire protocol](https://docs.arduino.cc/learn/communication/one-wire)
+* [Raspberry gpiozero](https://gpiozero.readthedocs.io/en/stable/index.html)

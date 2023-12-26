@@ -6,7 +6,6 @@ I also included RS links, where possible
 
 ## Arduino and Board
 
-
 * 1x Arduino Nano v3 - [welectron AI-100005](https://www.welectron.com/Arduino-Nano_1), [RS 6961667](https://uk.rs-online.com/web/p/products/6961667/) - 19.99 Euro/piece - (can be replaced with a clone)
 * 1x female header BL1-036-G700-95 - [RET 53-03-04](https://www.ret.hu/shop/product/e-tec/36g-buchsenleiste_53-03-04) - 1199 HUF/piece
 * 1x 1N 4001 diode - [RET 19-00-01](https://www.ret.hu/shop/product/diotec/1n-4001_19-00-01), [RS 628-8931](https://uk.rs-online.com/web/p/schottky-diodes-rectifiers/6288931) - 18 HUF

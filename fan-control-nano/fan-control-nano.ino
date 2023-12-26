@@ -21,12 +21,11 @@ Pin Assignment:
    * PIN D12          Dallas 1-wire DS18B20
    * PIN A7  (ADC)    LM35
    * PIN A6  (ADC)    NTC Thermistor - NTC B57164K0472K000 Rn: 4k7 Ohm; K = 3950; Rs = 4k7 Ohm
+   * PIN A0  (ADC)    AD22100KTZ
   Optional temperature pins:
-   * PIN A0  (ADC) - tF
    * PIN A1  (ADC) - tE
    * PIN A2  (ADC) - tD
    * PIN A3  (ADC) - tC
-   * PIN A6  (ADC) - tB
 
   Optional display pins:
    * PIN D4        - button press
@@ -46,8 +45,9 @@ Serial Commands:
    * pwm[A-F][0-255]  - SET PWM output manually
    * rpm[C,D]?        - GET RPM output from 4-wire fans
    * t?               - GET measured temperature
-   * t[D,L]?          - GET measured temperature from selected source
-   * ts?              - GET temperature sources (example Dallas 1-wire or LM35)
+   * t[A,D,L,N]?        - GET measured temperature from selected source
+   * ts?              - GET temperature source (example Dallas 1-wire)
+   * tsa?             - GET all available temperature sources
 
   Optional Functions: [when extra circuit is present]
    * lcd[?,0-4] - GET/SET LCD Backlight; Update LCD
@@ -113,16 +113,17 @@ volatile unsigned long tD = 0;
 byte t0_corr = 0;
 
 // Define temperature and lcd pins
-char tempSource = 'D';      // The source of the temperature: 'N' - NTC, 'L' - LM35, 'D' - DS18B20, ...
+char tempSource = 'D';      // The source of the temperature: 'N' - NTC, 'L' - LM35, 'D' - DS18B20, 'A' - AD22100KTZ, ...
 const byte lm35 = A7;       // if an LM35 is connected
 const byte ntc  = A6;       // if an NTC is connected
+const byte ad22100 = A0;    // if an AD22100KTZ is connected
 const byte OneWireBus = 4;  // Data wire for OneWire
 bool dallasPresent = true;  // store dallas sensor status
 
 // Define the thermistor
 // Ref for external library: https://www.arduino.cc/reference/en/libraries/thermistor/
-// NTC B57164K0472K000 Rn: 4k7 Ohm; K = 3950; Rs = 4k7 Ohm
-float Rn_ntc = 4700.00;
+// NTC B57164K0472K000 R25: 4k7 Ohm; K = 3950; Rs = 4k7 Ohm
+float R25_ntc = 4700.00;
 float K_ntc = 3950.00;
 float Rs_ntc = 4700.00;
 
@@ -175,6 +176,7 @@ void setup() {  // The initial setup, that will run every time when we connect t
   // analogReference(INTERNAL);    // set AREF to 1.1 V
   pinMode(ntc,  INPUT);
   pinMode(lm35, INPUT);
+  pinMode(ad22100, INPUT);
 
   // Copied the relevant part from here: http://playground.arduino.cc/Code/PwmFrequency
   // Also refs: 
@@ -202,26 +204,40 @@ void setup() {  // The initial setup, that will run every time when we connect t
 float ntcTemp() {
     float ADCntc = analogRead(ntc);
     // Calculate the measured resistance using the reference series resistance.
-    float Rm_ntc = Rs_ntc / ((1024.00/ADCntc) - 1);
+    float RT_ntc = Rs_ntc / ((1024.00/ADCntc) - 1.00);
     // Calculate the 1/T from the Steinhart equation. Note: T0 is in Kelvin.
-    float recT = 1/(273+25) + log(Rm_ntc/Rn_ntc)/K_ntc;
+    float recT = 1.00/(273.00+25.00) + log(RT_ntc/R25_ntc)/K_ntc;
     // Convert to Celsius.
-    return 1/recT - 273.00; 
+    return 1.00/recT - 273.00; 
+}
+
+float ad22100Temp() {
+  // AD22100KTZ: V_out = (V_ref/5V) * (1,375 V + 0,0225 V/°C * T)
+  //             T = (V_out–1,375V)/0,0225 V/°C
+  //             T = (adc*(V_ref/1024) – 1,375 V) /0,0225 V/°C
+
+  // If AREF = 5000 mV
+  // Resolution: 0.217°C;
+  // Range: -50°C - 150°C [51 - 973 ADC] 
+
+  float adc = analogRead(ad22100);
+  float V_out = adc*(5000.00/1024.00);
+  return (V_out - 1.375)/0.0225;
 }
 
 float lm35Temp() {
   // LM35DZ: 10mV/°C -> (adc*(aref/1024))/10
   
   // Settings for AREF = 1100 mV
-  // Resolution: 0,11°C; Precision +/- 1 °C
+  // Resolution: 0.11°C; Precision +/- 1 °C
   // Range: 0°C - 110°C [0 - 1023 ADC]
   
   // Settings for AREF = 5000 mV
-  // Resolution: 0,49°C; Precision +/- 1 °C
+  // Resolution: 0.49°C; Precision +/- 1 °C
   // Range: 0°C - 110°C [0 - 225 ADC]
 
   float tmV = analogRead(lm35);
-  return tmV*(110.00/1024.00);
+  return tmV*(500.00/1024.00);
 }
 
 float ds18Temp() {
@@ -246,6 +262,8 @@ float getTemperature(char Source) {
       return lm35Temp(); break;
     case 'D':
       return ds18Temp(); break;
+    case 'A':
+      return ad22100Temp(); break;
     default:
       break;
   }
@@ -286,6 +304,8 @@ void loop() {
           Serial.println(lm35Temp()); break;  // Only for debugging
         case 'D':
           Serial.println(ds18Temp()); break;  // Only for debugging
+        case 'A':
+          Serial.println(ad22100Temp()); break;  // Only for debugging
         default:
           Serial.print("Syntax Error: "); Serial.println(inputString);
           break;
@@ -315,7 +335,7 @@ void loop() {
             break;
         }
       } else if (inputString.endsWith("p")) {
-        // Set to pilot mode from manual.
+        // Set to pilot mode from manual to auto.
         int value = constrain(inputString.charAt(3),65,69)-65;
         preset[value][0] = 0;
         Serial.println("OK");

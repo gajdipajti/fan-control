@@ -1,0 +1,87 @@
+#!/usr/bin/python
+# A basic munin-node plugin to monitor the Fan Control Nano.
+"""
+USAGE
+
+    rename the file to contain the tty device: fan-control-nano_ttyUSB0
+	add dialout permissions
+
+DESCRIPTION
+
+    A Munin plugin to graph the temperatures and fan speeds of a rack. It requires
+    the Fan Control Nano.
+
+AUTHOR
+
+    Tamás Gajdos [https://github.com/gajdipajti]
+    Founded by the Free Software Foundation Hungary.
+
+LICENSE
+
+    This munin plugin script is GPLv3 licensed.
+"""
+
+
+import re
+import serial
+import sys
+
+# Extract tty device from filename
+ttyDevice = re.search('_tty(.*)', __file__)
+# print(ttyDevice.group()[1:])
+
+# Create the connection
+ser = serial.Serial("/dev/" + ttyDevice.group()[1:], baudrate=115200, timeout=3.0)
+
+# Implemented functions, to extract data
+def getTemperature():
+  ser.write(b't?\r')
+  answer = ser.readline()
+  temperature = bytes(answer).decode('ASCII')
+  return temperature.strip()
+
+def getTemperatureSource():
+  ser.write(b'ts?\r')
+  answer = ser.readline()
+  tempSource = bytes(answer).decode('ASCII')
+  match tempSource[0]:
+    case 'N':
+      return 'NTC'
+    case 'L':
+      return 'LM35'
+    case 'D':
+      return 'DS18B20'
+    case 'A':
+      return 'AD22100KTZ'
+    case _:
+      return 'Unknown'
+
+def getRPM():
+  ser.write(b'rpm?\r')
+  answer = ser.readline()
+  rpmValues = bytes(answer).decode('ASCII')
+  return rpmValues.strip()
+
+def getPWM():
+  ser.write(b'pwmA?\r')
+  answer = ser.readline()
+  pwmValues = bytes(answer).decode('ASCII')
+  return pwmValues.strip()
+
+if len(sys.argv) == 2:
+  # Something was passed
+  match sys.argv[1]:
+    case 'autoconf':
+      print('yes')
+    case 'config':
+      # We configure the plugin here
+      # print('multigraph fan_control_temp')
+      print('graph_title Fan Control Nano Temperature: ' + getTemperatureSource())
+      print('graph_vlabel Temperature in Celsius')
+      print('graph_category Sensors')
+      print('temp.label Measured Temperature')
+      print('graph_args --base 1000  --lower-limit 0 --upper-limit 85')
+else:
+   print('temp.value ' + getTemperature())
+
+ser.close()

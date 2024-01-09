@@ -142,7 +142,7 @@ DeviceAddress insideThermometer;
 // For serial communication.
 String inputString = "";        // a string to hold incoming data
 bool stringComplete = false;    // whether the string is complete
-bool automode = true;           // enable auto mode
+bool automode = false;           // enable auto mode
 
 // Wait mode
 short waitPeriod = 1000;
@@ -195,8 +195,9 @@ void setup() {  // The initial setup, that will run every time when we connect t
   if (!sensors.getAddress(insideThermometer, 0)) {
     Serial.println("Unable to find address for Device 0");
     dallasPresent = false;
+  } else {
+    sensors.setResolution(insideThermometer, 10);
   }
-  sensors.setResolution(insideThermometer, 10);
 
   digitalWrite(LED_BUILTIN, LOW);
 }
@@ -291,13 +292,21 @@ unsigned long toRPM(unsigned long irpm, byte correction) {
 
 void loop() {
   if (stringComplete) {
-    Serial.println(inputString);
+    // Serial.println(inputString);  // Echo
     if (inputString.startsWith("t")) {
       switch(inputString.charAt(1)) {
         case '?':
           Serial.println(getTemperature(tempSource)); break;
         case 's':
-          Serial.println(tempSource); break;  // Display source
+          Serial.println(tempSource);          // Display source
+          if (dallasPresent) { 
+            Serial.print("Device DS18B20 Address: ");
+            for (byte jdx = 0; jdx < 8; jdx++) {
+              Serial.print(insideThermometer[jdx], HEX);
+            }
+            Serial.println(";");
+          }
+          break;
         case 'N':
           Serial.println(ntcTemp());  break;  // Only for debugging
         case 'L':
@@ -350,12 +359,11 @@ void loop() {
     } else if (inputString.startsWith("rpm")) {
       switch(inputString.charAt(3)) {
         case 'C':
-
           Serial.println(toRPM(t_irpmC, t0_corr)); break;
         case 'D':
           Serial.println(toRPM(t_irpmD, t0_corr)); break;
         case '?':
-          Serial.print(toRPM(t_irpmC, t0_corr)); Serial.print("; ");
+          Serial.print(toRPM(t_irpmC, t0_corr)); Serial.print(";");
           Serial.println(toRPM(t_irpmD, t0_corr)); break;
         default:
           Serial.print("Syntax Error: "); Serial.println(inputString);
@@ -444,6 +452,7 @@ void loop() {
       }
     }
     // Do your thing
+    inputString = ""; stringComplete = false;      //clear the string
   } else if (automode) {
     // GET temperature in float, convert to int
     // UPDATE pwm if not in manual
@@ -456,8 +465,9 @@ void loop() {
         analogWrite(pwm[idx], preset[idx][1]);
       }
     }
+  } else {
+    delay(1);
   }
-  inputString = ""; stringComplete = false;      //clear the string
   //serialEvent();  // Workaround for ATTiny or ATMega chips without hardware serial
 }
 
